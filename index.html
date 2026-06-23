@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>MyNirvaha</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    /* ─── CSS Variables — Telegram Theme Aware ─── */
+    :root {
+      --primary: #1a237e;
+      --primary-light: #3949ab;
+      --accent: #00897b;
+      --income: #2e7d32;
+      --expense: #c62828;
+      --deleted: #9e9e9e;
+      --bg: var(--tg-theme-bg-color, #f5f5f5);
+      --card-bg: var(--tg-theme-secondary-bg-color, #ffffff);
+      --text: var(--tg-theme-text-color, #212121);
+      --hint: var(--tg-theme-hint-color, #757575);
+      --border: #e0e0e0;
+      --radius: 12px;
+      --shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding-bottom: 80px;
+    }
+
+    /* ─── Header ─── */
+    .header {
+      background: var(--primary);
+      color: #fff;
+      padding: 16px 20px 14px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    .header-title { font-size: 18px; font-weight: 700; letter-spacing: 0.5px; }
+    .header-sub { font-size: 12px; opacity: 0.8; }
+    .header-role {
+      background: rgba(255,255,255,0.2);
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    /* ─── Screens ─── */
+    .screen { display: none; padding: 16px; }
+    .screen.active { display: block; }
+
+    /* ─── Cards ─── */
+    .card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: var(--shadow);
+    }
+    .card-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--hint);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 10px;
+    }
+
+    /* ─── Summary Row ─── */
+    .summary-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .stat-box {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 14px 10px;
+      text-align: center;
+      box-shadow: var(--shadow);
+    }
+    .stat-box .val {
+      font-size: 18px;
+      font-weight: 800;
+      display: block;
+    }
+    .stat-box .lbl { font-size: 11px; color: var(--hint); margin-top: 3px; display: block; }
+    .stat-income .val { color: var(--income); }
+    .stat-expense .val { color: var(--expense); }
+    .stat-balance .val { color: var(--primary); }
+
+    /* ─── Buttons ─── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 13px 20px;
+      border-radius: var(--radius);
+      border: none;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      width: 100%;
+    }
+    .btn:active { transform: scale(0.97); opacity: 0.85; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-accent  { background: var(--accent); color: #fff; }
+    .btn-income  { background: var(--income); color: #fff; }
+    .btn-expense { background: var(--expense); color: #fff; }
+    .btn-outline {
+      background: transparent;
+      border: 2px solid var(--primary);
+      color: var(--primary);
+    }
+    .btn-sm { padding: 8px 14px; font-size: 13px; width: auto; }
+    .btn-danger { background: var(--expense); color: #fff; }
+
+    /* ─── Form Elements ─── */
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 13px; font-weight: 600; color: var(--hint); margin-bottom: 6px; }
+    .field input, .field select, .field textarea {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 15px;
+      background: var(--card-bg);
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .field input:focus, .field select:focus, .field textarea:focus {
+      border-color: var(--primary);
+    }
+
+    /* ─── Log Entry Card ─── */
+    .log-item {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      box-shadow: var(--shadow);
+      border-left: 4px solid transparent;
+    }
+    .log-item.INCOME  { border-left-color: var(--income); }
+    .log-item.EXPENSE { border-left-color: var(--expense); }
+    .log-item.DELETED { border-left-color: var(--deleted); opacity: 0.6; }
+    .log-item.PENDING_DELETE { border-left-color: #ff6f00; }
+
+    .log-header { display: flex; justify-content: space-between; align-items: flex-start; }
+    .log-category { font-weight: 700; font-size: 15px; }
+    .log-amount { font-size: 16px; font-weight: 800; }
+    .log-amount.INCOME  { color: var(--income); }
+    .log-amount.EXPENSE { color: var(--expense); }
+    .log-amount.DELETED { color: var(--deleted); text-decoration: line-through; }
+
+    .log-meta { font-size: 12px; color: var(--hint); margin-top: 4px; }
+    .log-status {
+      display: inline-block;
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+    .status-ACTIVE         { background: #e8f5e9; color: var(--income); }
+    .status-DELETED        { background: #fafafa; color: var(--deleted); }
+    .status-PENDING_DELETE { background: #fff3e0; color: #e65100; }
+
+    .log-delete-btn {
+      margin-top: 8px;
+      background: #ffebee;
+      color: var(--expense);
+      border: none;
+      padding: 5px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* ─── Bottom Nav ─── */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--card-bg);
+      display: flex;
+      box-shadow: 0 -2px 12px rgba(0,0,0,0.1);
+      z-index: 100;
+    }
+    .nav-btn {
+      flex: 1;
+      border: none;
+      background: none;
+      padding: 10px 0 8px;
+      cursor: pointer;
+      color: var(--hint);
+      font-size: 11px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      transition: color 0.2s;
+    }
+    .nav-btn.active { color: var(--primary); }
+    .nav-icon { font-size: 22px; }
+
+    /* ─── Type Toggle ─── */
+    .type-toggle {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .type-btn {
+      padding: 12px;
+      border-radius: var(--radius);
+      border: 2px solid var(--border);
+      background: var(--card-bg);
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s;
+    }
+    .type-btn.selected-income  { background: var(--income);  color: #fff; border-color: var(--income); }
+    .type-btn.selected-expense { background: var(--expense); color: #fff; border-color: var(--expense); }
+
+    /* ─── Alerts ─── */
+    .alert {
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 12px;
+      display: none;
+    }
+    .alert.show { display: block; }
+    .alert-success { background: #e8f5e9; color: #1b5e20; border: 1px solid #c8e6c9; }
+    .alert-error   { background: #ffebee; color: #b71c1c; border: 1px solid #ffcdd2; }
+    .alert-info    { background: #e3f2fd; color: #0d47a1; border: 1px solid #bbdefb; }
+
+    /* ─── Loading ─── */
+    .loader {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+      color: var(--hint);
+      font-size: 14px;
+      gap: 10px;
+    }
+    .spinner {
+      width: 24px; height: 24px;
+      border: 3px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── Empty State ─── */
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--hint);
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-state p { font-size: 15px; }
+
+    /* ─── Invite Box ─── */
+    .invite-box {
+      background: #e8eaf6;
+      border-radius: var(--radius);
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+    .invite-link {
+      font-family: monospace;
+      font-size: 12px;
+      word-break: break-all;
+      color: var(--primary);
+      margin-top: 8px;
+    }
+
+    /* ─── Date filter ─── */
+    .filter-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      align-items: center;
+    }
+    .filter-row input[type=date] {
+      flex: 1;
+      padding: 10px 12px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 14px;
+      background: var(--card-bg);
+      color: var(--text);
+    }
+    .filter-row .btn { width: auto; padding: 10px 16px; }
+
+    .section-divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 14px 0;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════
+     HEADER
+════════════════════════════════════════════════ -->
+<div class="header">
+  <div>
+    <div class="header-title">🏨 MyNirvaha</div>
+    <div class="header-sub" id="headerHotelName">Loading...</div>
+  </div>
+  <div class="header-role" id="headerRole">—</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SCREEN: LOADING
+════════════════════════════════════════════════ -->
+<div class="screen active" id="screenLoading">
+  <div class="loader">
+    <div class="spinner"></div>
+    Connecting to server...
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SCREEN: REGISTER (new user)
+════════════════════════════════════════════════ -->
+<div class="screen" id="screenRegister">
+  <div class="card">
+    <div class="card-title">🏨 Register Your Hotel</div>
+    <p style="font-size:14px;color:var(--hint);margin-bottom:16px;">
+      Start your 14-day free trial. No credit card required.
+    </p>
+    <div class="alert" id="registerAlert"></div>
+    <div class="field">
+      <label>Hotel / Business Name</label>
+      <input type="text" id="hotelNameInput" placeholder="e.g. Sri Venkata Tiffins" maxlength="100" />
+    </div>
+    <button class="btn btn-primary" onclick="doRegister()">🚀 Start Free Trial</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SCREEN: INVITE (staff accepting invite)
+════════════════════════════════════════════════ -->
+<div class="screen" id="screenInvite">
+  <div class="card">
+    <div class="card-title">👋 You're Invited!</div>
+    <div id="inviteHotelInfo" style="font-size:15px;margin-bottom:16px;"></div>
+    <div class="alert" id="inviteAlert"></div>
+    <button class="btn btn-accent" onclick="doJoinStaff()">✅ Join as Staff</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SCREEN: HOME (Dashboard - Owner & Staff)
+════════════════════════════════════════════════ -->
+<div class="screen" id="screenHome">
+  <!-- Summary cards -->
+  <div class="summary-row">
+    <div class="stat-box stat-income">
+      <span class="val" id="summaryIncome">₹0</span>
+      <span class="lbl">Income</span>
+    </div>
+    <div class="stat-box stat-expense">
+      <span class="val" id="summaryExpense">₹0</span>
+      <span class="lbl">Expense</span>
+    </div>
+    <div class="stat-box stat-balance">
+      <span class="val" id="summaryBalance">₹0</span>
+      <span class="lbl">Balance</span>
+    </div>
+  </div>
+
+  <!-- Date filter (owner only) -->
+  <div class="filter-row" id="dateFilterRow" style="display:none;">
+    <input type="date" id="dashboardDate" />
+    <button class="btn btn-outline btn-sm" onclick="loadDashboard()">Filter</button>
+    <button class="btn btn-outline btn-sm" onclick="clearDateFilter()">All</button>
+  </div>
+
+  <!-- Log entries list -->
+  <div id="logsList">
+    <div class="loader"><div class="spinner"></div> Loading entries...</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SCREEN: LOG ENTRY (Submit new entry)
+════════════════════════════════════════════════ -->
+<div class="screen" id="screenLog">
+  <div class="card">
+    <div class="card-title">📝 New Entry</div>
+    <div class="alert" id="logAlert"></div>
+
+    <!-- Type Toggle -->
+    <div class="type-toggle">
+      <div class="type-btn" id="typeIncome" onclick="selectType('INCOME')">💰 Income</div>
+      <div class="type-btn" id="typeExpense" onclick="selectType('EXPENSE')">💸 Expense</div>
+    </div>
+
+    <div class="field">
+      <label>Category</label>
+      <select id="categorySelect">
+        <option value="">— Select category —</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Amount (₹)</label>
+      <input type="number" id="amountInput" placeholder="0.00" min="1" step="0.01" />
+    </div>
+
+    <div class="field">
+      <label>Note (optional)</label>
+      <input type="text" id="noteInput" placeholder="Brief description..." maxlength="200" />
+    </div>
+
+    <button class="btn btn-primary" id="submitLogBtn" onclick="doSubmitLog()">
+      ✅ Submit Entry
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SCREEN: OWNER TOOLS
+════════════════════════════════════════════════ -->
+<div class="screen" id="screenOwner">
+  <div class="card">
+    <div class="card-title">🔗 Invite Staff</div>
+    <p style="font-size:14px;color:var(--hint);margin-bottom:12px;">Generate a 24-hour invite link for a new staff member.</p>
+    <button class="btn btn-primary" onclick="doGenerateInvite()">Generate Invite Link</button>
+    <div id="inviteResult" style="margin-top:12px;"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🏨 Hotel Info</div>
+    <div id="ownerHotelInfo" style="font-size:14px;line-height:1.7;"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     BOTTOM NAVIGATION
+════════════════════════════════════════════════ -->
+<nav class="bottom-nav" id="bottomNav" style="display:none;">
+  <button class="nav-btn active" id="navHome" onclick="switchTab('Home')">
+    <span class="nav-icon">📊</span>Dashboard
+  </button>
+  <button class="nav-btn" id="navLog" onclick="switchTab('Log')">
+    <span class="nav-icon">➕</span>New Entry
+  </button>
+  <button class="nav-btn" id="navOwner" onclick="switchTab('Owner')" id="navOwnerBtn" style="display:none;">
+    <span class="nav-icon">⚙️</span>Manage
+  </button>
+</nav>
+
+<!-- ═══════════════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════════════════ -->
+<script>
+// ──────────────────────────────────────────────────
+// CONFIGURATION — REPLACE THIS WITH YOUR GAS URL
+// ──────────────────────────────────────────────────
+var GAS_URL = "YOUR_GAS_WEB_APP_URL_HERE"; // e.g. https://script.google.com/macros/s/ABC.../exec
+
+// ──────────────────────────────────────────────────
+// APP STATE
+// ──────────────────────────────────────────────────
+var state = {
+  tg: null,
+  user: null,
+  initData: "",
+  role: null,       // "OWNER" | "STAFF" | null
+  hotel: null,
+  categories: [],
+  selectedType: "INCOME",
+  inviteToken: null,
+  inviteHotelId: null,
+  botUsername: null, // fetched from backend via getHotelInfo — never hardcoded
+};
+
+// ──────────────────────────────────────────────────
+// BOOT
+// ──────────────────────────────────────────────────
+window.addEventListener("load", function() {
+  state.tg = window.Telegram.WebApp;
+  state.tg.ready();
+  state.tg.expand();
+
+  // Guard: GAS_URL must be configured by the developer. This one value
+  // CANNOT be auto-resolved (the frontend has no way to know its own
+  // backend URL until the developer deploys and pastes it here).
+  if (!GAS_URL || GAS_URL.indexOf("YOUR_GAS_WEB_APP_URL_HERE") !== -1) {
+    document.body.innerHTML =
+      '<div style="padding:40px 20px;text-align:center;color:#c62828;font-family:sans-serif;">' +
+      '<h3>⚠️ Setup Incomplete</h3>' +
+      '<p>GAS_URL is not configured in index.html.<br>Replace the placeholder with your deployed Web App URL.</p>' +
+      '</div>';
+    return;
+  }
+
+  // Apply Telegram theme
+  document.documentElement.style.setProperty("--bg", state.tg.themeParams.bg_color || "#f5f5f5");
+
+  state.user = state.tg.initDataUnsafe.user;
+  state.initData = state.tg.initData;
+
+  // Check for invite token in start_param
+  var startParam = state.tg.initDataUnsafe.start_param || "";
+  if (startParam.startsWith("INV_")) {
+    state.inviteToken = startParam.substring(4);
+    handleInviteFlow();
+    return;
+  }
+
+  // Normal flow: check registration
+  checkRegistration();
+});
+
+// ──────────────────────────────────────────────────
+// API CALL HELPER
+// ──────────────────────────────────────────────────
+/**
+ * GET-based API call — for READ-ONLY actions (dashboard, categories, etc.)
+ * initData is encoded EXACTLY ONCE here, in the map loop. Never pre-encode
+ * it when building `params`, or the hash verification on the backend
+ * will mismatch (double-encoded % characters break the HMAC check).
+ */
+function api(action, extraParams) {
+  var params = Object.assign({ action: action, initData: state.initData }, extraParams || {});
+  var qs = Object.keys(params).map(function(k) {
+    return encodeURIComponent(k) + "=" + encodeURIComponent(params[k]);
+  }).join("&");
+
+  return fetch(GAS_URL + "?" + qs)
+    .then(function(r) { return r.json(); })
+    .catch(function(err) {
+      console.error("API error:", err);
+      return { success: false, error: "NETWORK_ERROR" };
+    });
+}
+
+/**
+ * POST-based API call — for WRITE / mutation actions (submitLog,
+ * registerHotel, joinAsStaff, requestDelete, generateInvite, etc.)
+ * Sends action + initData + payload as a JSON body instead of a query
+ * string. GAS doPost() reads this from e.postData.contents.
+ */
+function apiPost(action, extraParams) {
+  var payload = Object.assign({ action: action, initData: state.initData }, extraParams || {});
+
+  return fetch(GAS_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" }, // avoids CORS preflight on GAS
+    body: JSON.stringify(payload),
+  })
+    .then(function(r) { return r.json(); })
+    .catch(function(err) {
+      console.error("API error:", err);
+      return { success: false, error: "NETWORK_ERROR" };
+    });
+}
+
+// ──────────────────────────────────────────────────
+// SCREEN SWITCHING
+// ──────────────────────────────────────────────────
+function showScreen(name) {
+  document.querySelectorAll(".screen").forEach(function(s) { s.classList.remove("active"); });
+  document.getElementById("screen" + name).classList.add("active");
+}
+
+function switchTab(tab) {
+  document.querySelectorAll(".nav-btn").forEach(function(b) { b.classList.remove("active"); });
+  document.getElementById("nav" + tab).classList.add("active");
+  showScreen(tab);
+
+  if (tab === "Home") loadDashboard();
+  if (tab === "Log") loadCategories();
+  if (tab === "Owner") loadOwnerInfo();
+}
+
+// ──────────────────────────────────────────────────
+// CHECK REGISTRATION STATUS
+// ──────────────────────────────────────────────────
+function checkRegistration() {
+  showScreen("Loading");
+  api("getHotelInfo").then(function(res) {
+    if (res.botUsername) state.botUsername = res.botUsername;
+
+    if (!res.success) {
+      showScreen("Register");
+      return;
+    }
+
+    state.role = res.role;
+    state.hotel = res.hotel;
+
+    document.getElementById("headerHotelName").textContent = res.hotel.name;
+    document.getElementById("headerRole").textContent = res.role === "OWNER" ? "👑 Owner" : "👤 Staff";
+
+    // Show nav
+    document.getElementById("bottomNav").style.display = "flex";
+    if (res.role === "OWNER") {
+      document.getElementById("navOwnerBtn").style.display = "flex";
+    }
+
+    showScreen("Home");
+    loadDashboard();
+  });
+}
+
+// ──────────────────────────────────────────────────
+// REGISTRATION
+// ──────────────────────────────────────────────────
+function doRegister() {
+  var name = document.getElementById("hotelNameInput").value.trim();
+  if (!name || name.length < 3) {
+    showAlert("registerAlert", "error", "Hotel name must be at least 3 characters");
+    return;
+  }
+
+  showAlert("registerAlert", "info", "Registering...");
+  apiPost("registerHotel", { hotelName: name }).then(function(res) {
+    if (res.success) {
+      showAlert("registerAlert", "success", "✅ Registered! Setting up...");
+      setTimeout(checkRegistration, 1500);
+    } else {
+      var msgs = {
+        "ALREADY_REGISTERED": "You already have a hotel registered.",
+        "HOTEL_NAME_TOO_SHORT": "Name is too short (min 3 chars).",
+        "HOTEL_NAME_TOO_LONG": "Name is too long (max 100 chars).",
+        "REGISTRATION_FAILED": "Server error. Please try again.",
+      };
+      showAlert("registerAlert", "error", msgs[res.error] || res.error);
+    }
+  });
+}
+
+// ──────────────────────────────────────────────────
+// INVITE FLOW (Staff accepting invite)
+// ──────────────────────────────────────────────────
+function handleInviteFlow() {
+  showScreen("Loading");
+  // First validate the invite to get hotel name
+  fetch(GAS_URL + "?action=validateInvite&token=" + encodeURIComponent(state.inviteToken))
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+      if (!res.success) {
+        var reasons = {
+          "EXPIRED": "This invite link has expired (24-hour limit). Ask the owner for a new one.",
+          "SIGNATURE_MISMATCH": "Invalid invite link. Please use the correct link.",
+          "HOTEL_NOT_FOUND": "Hotel not found.",
+          "TOO_MANY_REQUESTS": "Server is busy right now — please wait a minute and try again.",
+        };
+        showScreen("Invite");
+        showAlert("inviteAlert", "error", reasons[res.error] || "Invalid invite: " + res.error);
+        return;
+      }
+
+      state.inviteHotelId = res.hotelId;
+      document.getElementById("inviteHotelInfo").innerHTML =
+        "You've been invited to join:<br><strong style='font-size:18px;'>" + escHtml(res.hotelName) + "</strong>";
+      showScreen("Invite");
+    });
+}
+
+function doJoinStaff() {
+  showAlert("inviteAlert", "info", "Joining...");
+  apiPost("joinAsStaff", { token: state.inviteToken }).then(function(res) {
+    if (res.success) {
+      showAlert("inviteAlert", "success", "✅ Joined " + res.hotelName + "!");
+      setTimeout(checkRegistration, 1500);
+    } else {
+      var msgs = {
+        "ALREADY_STAFF": "You are already a staff member here.",
+        "STAFF_OF_ANOTHER_HOTEL": "You are already staff at another hotel.",
+        "YOU_ARE_AN_OWNER": "You are an owner and cannot join as staff.",
+      };
+      showAlert("inviteAlert", "error", msgs[res.error] || res.error);
+    }
+  });
+}
+
+// ──────────────────────────────────────────────────
+// DASHBOARD
+// ──────────────────────────────────────────────────
+function loadDashboard() {
+  if (state.role === "OWNER") {
+    document.getElementById("dateFilterRow").style.display = "flex";
+  }
+
+  var dateVal = document.getElementById("dashboardDate") ? document.getElementById("dashboardDate").value : "";
+  var params = { initData: state.initData };
+  if (dateVal) params.date = dateVal;
+
+  document.getElementById("logsList").innerHTML = '<div class="loader"><div class="spinner"></div> Loading...</div>';
+
+  api("getDashboard", dateVal ? { date: dateVal } : {}).then(function(res) {
+    if (!res.success) {
+      document.getElementById("logsList").innerHTML =
+        '<div class="empty-state"><div class="icon">⚠️</div><p>' + res.error + '</p></div>';
+      return;
+    }
+
+    // Update summary
+    document.getElementById("summaryIncome").textContent  = "₹" + fmt(res.summary.totalIncome);
+    document.getElementById("summaryExpense").textContent = "₹" + fmt(res.summary.totalExpense);
+    var bal = res.summary.cashBalance;
+    var balEl = document.getElementById("summaryBalance");
+    balEl.textContent = "₹" + fmt(Math.abs(bal));
+    balEl.style.color = bal >= 0 ? "var(--income)" : "var(--expense)";
+
+    // Render logs
+    renderLogs(res.logs);
+  });
+}
+
+function clearDateFilter() {
+  document.getElementById("dashboardDate").value = "";
+  loadDashboard();
+}
+
+function renderLogs(logs) {
+  var container = document.getElementById("logsList");
+  if (!logs || logs.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>No entries yet today</p></div>';
+    return;
+  }
+
+  var html = "";
+  logs.forEach(function(log) {
+    var isOwn = state.user && String(log.staffTid) === String(state.user.id);
+    var canDelete = log.status === "ACTIVE" && isOwn;
+
+    var amountClass = log.status === "DELETED" ? "DELETED" : log.type;
+    var prefix = log.type === "INCOME" ? "+" : "-";
+    if (log.status === "DELETED") prefix = "";
+
+    html += '<div class="log-item ' + log.status + '">';
+    html += '<div class="log-header">';
+    html += '<span class="log-category">' + escHtml(log.category) + '</span>';
+    html += '<span class="log-amount ' + amountClass + '">' + prefix + '₹' + fmt(log.amount) + '</span>';
+    html += '</div>';
+    html += '<div class="log-meta">👤 ' + escHtml(log.staffName) + ' &nbsp;•&nbsp; 🕐 ' + log.loggedAt.substring(11, 16) + '</div>';
+    if (log.note) {
+      html += '<div class="log-meta">📝 ' + escHtml(log.note) + '</div>';
+    }
+    html += '<span class="log-status status-' + log.status + '">' + log.status.replace("_", " ") + '</span>';
+
+    if (canDelete) {
+      html += '<button class="log-delete-btn" onclick="requestDelete(\'' + log.logId + '\')">🗑️ Request Delete</button>';
+    }
+    html += '</div>';
+  });
+
+  container.innerHTML = html;
+}
+
+// ──────────────────────────────────────────────────
+// LOG ENTRY
+// ──────────────────────────────────────────────────
+function loadCategories() {
+  if (state.categories.length > 0) {
+    populateCategorySelect();
+    return;
+  }
+
+  api("getCategories").then(function(res) {
+    if (res.success) {
+      state.categories = res.categories;
+      populateCategorySelect();
+    }
+  });
+}
+
+function populateCategorySelect() {
+  var sel = document.getElementById("categorySelect");
+  var currentType = state.selectedType;
+  var filtered = state.categories.filter(function(c) { return c.type === currentType; });
+
+  sel.innerHTML = '<option value="">— Select category —</option>';
+  filtered.forEach(function(cat) {
+    sel.innerHTML += '<option value="' + escHtml(cat.name) + '">' + escHtml(cat.name) + '</option>';
+  });
+}
+
+function selectType(type) {
+  state.selectedType = type;
+  document.getElementById("typeIncome").className  = "type-btn" + (type === "INCOME"  ? " selected-income"  : "");
+  document.getElementById("typeExpense").className = "type-btn" + (type === "EXPENSE" ? " selected-expense" : "");
+  populateCategorySelect();
+}
+
+function doSubmitLog() {
+  var category = document.getElementById("categorySelect").value;
+  var amount   = parseFloat(document.getElementById("amountInput").value);
+  var note     = document.getElementById("noteInput").value.trim();
+
+  if (!category) { showAlert("logAlert", "error", "Please select a category"); return; }
+  if (!amount || amount <= 0) { showAlert("logAlert", "error", "Please enter a valid amount"); return; }
+
+  // NOTE: clientTs is intentionally just Date.now() with NO random suffix.
+  // The idempotency check on the backend works by matching this exact
+  // value — if two submissions carry the same clientTs, the second is
+  // correctly treated as a duplicate (e.g. an accidental double-tap or a
+  // network retry resubmitting the same request). Adding randomness here
+  // would defeat that protection, not improve it. The button is disabled
+  // immediately after the first tap (see below) as the real safeguard
+  // against a user manually firing multiple distinct submissions.
+  var clientTs = Date.now().toString();
+
+  document.getElementById("submitLogBtn").disabled = true;
+  document.getElementById("submitLogBtn").textContent = "Submitting...";
+  showAlert("logAlert", "info", "Saving entry...");
+
+  apiPost("submitLog", {
+    category: category,
+    type:     state.selectedType,
+    amount:   amount,
+    note:     note,
+    clientTs: clientTs,
+  }).then(function(res) {
+    document.getElementById("submitLogBtn").disabled = false;
+    document.getElementById("submitLogBtn").textContent = "✅ Submit Entry";
+
+    if (res.success) {
+      showAlert("logAlert", "success", "✅ Entry saved!" + (res.message === "DUPLICATE_IGNORED" ? " (duplicate ignored)" : ""));
+      // Reset form
+      document.getElementById("categorySelect").value = "";
+      document.getElementById("amountInput").value = "";
+      document.getElementById("noteInput").value = "";
+      // Haptic feedback
+      if (state.tg.HapticFeedback) state.tg.HapticFeedback.notificationOccurred("success");
+    } else {
+      var msgs = {
+        "NOT_A_STAFF_MEMBER": "You are not registered as staff.",
+        "MISSING_CATEGORY":   "Please select a category.",
+        "INVALID_AMOUNT":     "Invalid amount.",
+        "INVALID_TYPE":       "Invalid entry type.",
+        "INVALID_CATEGORY":   "This category is not valid. Please refresh and try again.",
+        "BUSY_TRY_AGAIN":     "Another entry is being saved right now — please tap Submit again.",
+      };
+      showAlert("logAlert", "error", msgs[res.error] || res.error);
+      if (state.tg.HapticFeedback) state.tg.HapticFeedback.notificationOccurred("error");
+    }
+  });
+}
+
+// ──────────────────────────────────────────────────
+// DELETE REQUEST
+// ──────────────────────────────────────────────────
+function requestDelete(logId) {
+  if (!confirm("Request deletion of this entry? Owner approval needed.")) return;
+
+  apiPost("requestDelete", { logId: logId }).then(function(res) {
+    if (res.success) {
+      state.tg.showAlert("✅ Delete request sent to owner!");
+      loadDashboard();
+    } else {
+      var msgs = {
+        "NOT_YOUR_ENTRY":       "You can only delete your own entries.",
+        "DELETE_WINDOW_EXPIRED": "Delete window expired (10 minutes max).",
+        "ENTRY_NOT_ACTIVE":     "This entry is not active.",
+        "TIMESTAMP_ERROR":      "Could not verify entry time — please contact support.",
+      };
+      state.tg.showAlert("❌ " + (msgs[res.error] || res.error));
+    }
+  });
+}
+
+// ──────────────────────────────────────────────────
+// OWNER TOOLS
+// ──────────────────────────────────────────────────
+function loadOwnerInfo() {
+  if (!state.hotel) return;
+  document.getElementById("ownerHotelInfo").innerHTML =
+    "<b>Hotel:</b> " + escHtml(state.hotel.name) + "<br>" +
+    "<b>Status:</b> " + state.hotel.status + "<br>" +
+    "<b>Plan:</b> " + state.hotel.plan + "<br>" +
+    (state.hotel.trialEnds ? "<b>Trial Ends:</b> " + state.hotel.trialEnds : "");
+}
+
+function doGenerateInvite() {
+  document.getElementById("inviteResult").innerHTML = '<div class="loader"><div class="spinner"></div>Generating...</div>';
+
+  apiPost("generateInvite").then(function(res) {
+    if (!res.success) {
+      document.getElementById("inviteResult").innerHTML =
+        '<div class="alert alert-error show">❌ ' + res.error + '</div>';
+      return;
+    }
+
+    // Construct the invite link
+    // Staff clicks this link → opens bot → bot redirects to Mini App with INV_ param
+    if (!state.botUsername) {
+      document.getElementById("inviteResult").innerHTML =
+        '<div class="alert alert-error show">⚠️ Could not resolve bot username. Reopen the app and try again.</div>';
+      return;
+    }
+    var inviteUrl = "https://t.me/" + state.botUsername + "?start=INV_" + res.token;
+
+    document.getElementById("inviteResult").innerHTML =
+      '<div class="invite-box">' +
+      '<b>Share this link with your staff:</b>' +
+      '<div class="invite-link">' + inviteUrl + '</div>' +
+      '</div>' +
+      '<button class="btn btn-accent" onclick="copyInvite(\'' + inviteUrl + '\')">📋 Copy Invite Link</button>';
+  });
+}
+
+function copyInvite(url) {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(function() {
+      state.tg.showAlert("✅ Invite link copied to clipboard!");
+    });
+  } else {
+    state.tg.showAlert("Copy this link:\n" + url);
+  }
+}
+
+// ──────────────────────────────────────────────────
+// UTILITIES
+// ──────────────────────────────────────────────────
+function fmt(num) {
+  return (Math.round(num * 100) / 100).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+function escHtml(str) {
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function showAlert(id, type, msg) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.className = "alert alert-" + type + " show";
+  el.textContent = msg;
+  if (type === "success") {
+    setTimeout(function() { el.classList.remove("show"); }, 3000);
+  }
+}
+
+// Default: Income selected on log screen
+selectType("INCOME");
+</script>
+
+</body>
+</html>
