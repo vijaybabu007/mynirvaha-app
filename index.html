@@ -486,7 +486,7 @@
 // ──────────────────────────────────────────────────
 // CONFIGURATION — REPLACE THIS WITH YOUR GAS URL
 // ──────────────────────────────────────────────────
-var GAS_URL = "https://script.google.com/macros/s/AKfycbz_cPlcr179PNHNN8eY3auzrxYmwXefbAgbFX0rmvbQDsIkXEpdDvW6-uSJe-gyVrdW/exec"; // e.g. https://script.google.com/macros/s/ABC.../exec,
+var GAS_URL = "YOUR_GAS_WEB_APP_URL_HERE"; // e.g. https://script.google.com/macros/s/ABC.../exec
 
 // ──────────────────────────────────────────────────
 // APP STATE
@@ -656,7 +656,17 @@ function doRegister() {
         "HOTEL_NAME_TOO_LONG": "Name is too long (max 100 chars).",
         "REGISTRATION_FAILED": "Server error. Please try again.",
       };
-      showAlert("registerAlert", "error", msgs[res.error] || res.error);
+
+      if (res.error === "AUTH_FAILED") {
+        // Show the SPECIFIC reason + hint from the backend, instead of
+        // just "AUTH_FAILED" — this is what actually tells us (and you)
+        // what to fix, without needing to check GAS Execution logs.
+        showAlert("registerAlert", "error",
+          "AUTH_FAILED (" + (res.reason || "UNKNOWN") + "): " + (res.hint || "No additional detail available.")
+        );
+      } else {
+        showAlert("registerAlert", "error", msgs[res.error] || res.error);
+      }
     }
   });
 }
