@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
   <title>MyNirvaha</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
@@ -203,6 +203,7 @@
       display: flex;
       box-shadow: 0 -2px 12px rgba(0,0,0,0.1);
       z-index: 100;
+      padding-bottom: env(safe-area-inset-bottom);
     }
     .nav-btn {
       flex: 1;
@@ -322,6 +323,10 @@
       border-top: 1px solid var(--border);
       margin: 14px 0;
     }
+
+    @supports (padding-bottom: env(safe-area-inset-bottom)) {
+      .bottom-nav { padding-bottom: env(safe-area-inset-bottom); }
+    }
   </style>
 </head>
 <body>
@@ -430,6 +435,7 @@
         <option value="">— Select category —</option>
       </select>
     </div>
+    <button class="btn btn-outline btn-sm" onclick="loadCategories(true)" style="margin-bottom:12px;">🔄 Refresh Categories</button>
 
     <div class="field">
       <label>Amount (₹)</label>
@@ -474,7 +480,7 @@
   <button class="nav-btn" id="navLog" onclick="switchTab('Log')">
     <span class="nav-icon">➕</span>New Entry
   </button>
-  <button class="nav-btn" id="navOwner" onclick="switchTab('Owner')" id="navOwnerBtn" style="display:none;">
+  <button class="nav-btn" id="navOwner" onclick="switchTab('Owner')" style="display:none;">
     <span class="nav-icon">⚙️</span>Manage
   </button>
 </nav>
@@ -484,24 +490,19 @@
 ════════════════════════════════════════════════ -->
 <script>
 // ──────────────────────────────────────────────────
-// CONFIGURATION — REPLACE THIS WITH YOUR GAS URL
-// ──────────────────────────────────────────────────
-var GAS_URL = "https://script.google.com/macros/s/AKfycbz_cPlcr179PNHNN8eY3auzrxYmwXefbAgbFX0rmvbQDsIkXEpdDvW6-uSJe-gyVrdW/exec"; // e.g. https://script.google.com/macros/s/ABC.../exec
-
-// ──────────────────────────────────────────────────
 // APP STATE
 // ──────────────────────────────────────────────────
 var state = {
   tg: null,
   user: null,
   initData: "",
-  role: null,       // "OWNER" | "STAFF" | null
+  role: null,
   hotel: null,
   categories: [],
   selectedType: "INCOME",
   inviteToken: null,
   inviteHotelId: null,
-  botUsername: null, // fetched from backend via getHotelInfo — never hardcoded
+  botUsername: null,
 };
 
 // ──────────────────────────────────────────────────
@@ -512,23 +513,23 @@ window.addEventListener("load", function() {
   state.tg.ready();
   state.tg.expand();
 
-  // Guard: GAS_URL must be configured by the developer. This one value
-  // CANNOT be auto-resolved (the frontend has no way to know its own
-  // backend URL until the developer deploys and pastes it here).
-  if (!GAS_URL || GAS_URL.indexOf("YOUR_GAS_WEB_APP_URL_HERE") !== -1) {
-    document.body.innerHTML =
-      '<div style="padding:40px 20px;text-align:center;color:#c62828;font-family:sans-serif;">' +
-      '<h3>⚠️ Setup Incomplete</h3>' +
-      '<p>GAS_URL is not configured in index.html.<br>Replace the placeholder with your deployed Web App URL.</p>' +
-      '</div>';
-    return;
-  }
-
   // Apply Telegram theme
   document.documentElement.style.setProperty("--bg", state.tg.themeParams.bg_color || "#f5f5f5");
 
   state.user = state.tg.initDataUnsafe.user;
   state.initData = state.tg.initData;
+
+  // Handle viewport changes (keyboard, safe area)
+  if (state.tg.onEvent) {
+    state.tg.onEvent("viewportChanged", function() {
+      var nav = document.getElementById("bottomNav");
+      if (nav && state.tg.viewportStable) {
+        nav.style.paddingBottom = (state.tg.viewportStable.height - window.innerHeight > 0)
+          ? "env(safe-area-inset-bottom)" : "0";
+      }
+      document.body.style.height = state.tg.viewportStable.height + "px";
+    });
+  }
 
   // Check for invite token in start_param
   var startParam = state.tg.initDataUnsafe.start_param || "";
@@ -543,40 +544,13 @@ window.addEventListener("load", function() {
 });
 
 // ──────────────────────────────────────────────────
-// API CALL HELPER
+// API CALL HELPER — ALL calls use POST with JSON body
 // ──────────────────────────────────────────────────
-/**
- * GET-based API call — for READ-ONLY actions (dashboard, categories, etc.)
- * initData is encoded EXACTLY ONCE here, in the map loop. Never pre-encode
- * it when building `params`, or the hash verification on the backend
- * will mismatch (double-encoded % characters break the HMAC check).
- */
 function api(action, extraParams) {
-  var params = Object.assign({ action: action, initData: state.initData }, extraParams || {});
-  var qs = Object.keys(params).map(function(k) {
-    return encodeURIComponent(k) + "=" + encodeURIComponent(params[k]);
-  }).join("&");
-
-  return fetch(GAS_URL + "?" + qs)
-    .then(function(r) { return r.json(); })
-    .catch(function(err) {
-      console.error("API error:", err);
-      return { success: false, error: "NETWORK_ERROR" };
-    });
-}
-
-/**
- * POST-based API call — for WRITE / mutation actions (submitLog,
- * registerHotel, joinAsStaff, requestDelete, generateInvite, etc.)
- * Sends action + initData + payload as a JSON body instead of a query
- * string. GAS doPost() reads this from e.postData.contents.
- */
-function apiPost(action, extraParams) {
   var payload = Object.assign({ action: action, initData: state.initData }, extraParams || {});
-
-  return fetch(GAS_URL, {
+  return fetch(window.GAS_URL, {
     method: "POST",
-    headers: { "Content-Type": "text/plain;charset=utf-8" }, // avoids CORS preflight on GAS
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
     body: JSON.stringify(payload),
   })
     .then(function(r) { return r.json(); })
@@ -584,6 +558,69 @@ function apiPost(action, extraParams) {
       console.error("API error:", err);
       return { success: false, error: "NETWORK_ERROR" };
     });
+}
+
+// ──────────────────────────────────────────────────
+// UNIFIED API RESPONSE HANDLER
+// ──────────────────────────────────────────────────
+function handleApiResponse(res, onSuccess, onError, alertId, useNativeAlert) {
+  if (res.success) {
+    if (onSuccess) onSuccess(res);
+    return;
+  }
+  var msg = res.detail || res.error || "Unknown error";
+  var friendly = {
+    "AUTH_FAILED": "Session expired. Please reopen the app.",
+    "NETWORK_ERROR": "Network error. Check connection and retry.",
+    "SERVER_ERROR": "Server error. Please try again.",
+    "TOO_MANY_REQUESTS": "Too many requests. Wait a moment.",
+    "RATE_LIMITED": "Please wait before trying again.",
+    "BUSY_TRY_AGAIN": "Server busy. Tap again in a moment.",
+    "NOT_A_STAFF_MEMBER": "You are not registered as staff.",
+    "MISSING_CATEGORY": "Please select a category.",
+    "INVALID_AMOUNT": "Invalid amount.",
+    "INVALID_TYPE": "Invalid entry type.",
+    "INVALID_CATEGORY": "Category not valid. Refresh and retry.",
+    "NOT_YOUR_ENTRY": "You can only delete your own entries.",
+    "DELETE_WINDOW_EXPIRED": "Delete window expired (10 min max).",
+    "ENTRY_NOT_ACTIVE": "This entry is not active.",
+    "TIMESTAMP_ERROR": "Time verification failed. Contact support.",
+    "NOT_AUTHORIZED": "Not authorized.",
+    "LOG_NOT_FOUND": "Entry not found.",
+    "NOT_PENDING_DELETE": "Entry no longer pending delete.",
+    "ALREADY_REGISTERED": "Hotel already registered.",
+    "HOTEL_NAME_TOO_SHORT": "Name too short (min 3 chars).",
+    "HOTEL_NAME_TOO_LONG": "Name too long (max 100 chars).",
+    "REGISTRATION_FAILED": "Registration failed. Try again.",
+    "NOT_AN_OWNER": "Only owners can do this.",
+    "ALREADY_STAFF": "Already a staff member here.",
+    "STAFF_OF_ANOTHER_HOTEL": "Already staff at another hotel.",
+    "YOU_ARE_AN_OWNER": "Owners cannot join as staff.",
+    "INVALID_INVITE_EXPIRED": "Invite expired (24 hours).",
+    "INVALID_INVITE_SIGNATURE_MISMATCH": "Invalid invite link.",
+    "INVALID_INVITE_HOTEL_NOT_FOUND": "Hotel not found.",
+    "INVALID_INVITE_TOO_MANY_REQUESTS": "Server busy. Try again.",
+    "HOTEL_NOT_FOUND": "Hotel not found.",
+    "EXPIRED": "Invite expired.",
+    "SIGNATURE_MISMATCH": "Invalid invite.",
+    "UNKNOWN_ACTION": "Unknown action.",
+    "FORBIDDEN": "Admin only.",
+    "USER_NOT_FOUND": "User not found.",
+  };
+  var displayMsg = friendly[res.error] || msg;
+
+  if (useNativeAlert && state.tg && state.tg.showAlert) {
+    state.tg.showAlert("❌ " + displayMsg);
+  } else if (alertId) {
+    showAlert(alertId, "error", displayMsg);
+  } else {
+    if (state.tg && state.tg.showAlert) {
+      state.tg.showAlert("❌ " + displayMsg);
+    } else {
+      alert("Error: " + displayMsg);
+    }
+  }
+  if (onError) onError(res.error, displayMsg);
 }
 
 // ──────────────────────────────────────────────────
@@ -600,7 +637,7 @@ function switchTab(tab) {
   showScreen(tab);
 
   if (tab === "Home") loadDashboard();
-  if (tab === "Log") loadCategories();
+  if (tab === "Log") loadCategories(true); // Force refresh on tab switch
   if (tab === "Owner") loadOwnerInfo();
 }
 
@@ -611,6 +648,8 @@ function checkRegistration() {
   showScreen("Loading");
   api("getHotelInfo").then(function(res) {
     if (res.botUsername) state.botUsername = res.botUsername;
+    // Store GAS_URL for api() calls
+    if (res.gasUrl) window.GAS_URL = res.gasUrl;
 
     if (!res.success) {
       showScreen("Register");
@@ -623,10 +662,9 @@ function checkRegistration() {
     document.getElementById("headerHotelName").textContent = res.hotel.name;
     document.getElementById("headerRole").textContent = res.role === "OWNER" ? "👑 Owner" : "👤 Staff";
 
-    // Show nav
     document.getElementById("bottomNav").style.display = "flex";
     if (res.role === "OWNER") {
-      document.getElementById("navOwnerBtn").style.display = "flex";
+      document.getElementById("navOwner").style.display = "flex";
     }
 
     showScreen("Home");
@@ -645,29 +683,11 @@ function doRegister() {
   }
 
   showAlert("registerAlert", "info", "Registering...");
-  apiPost("registerHotel", { hotelName: name }).then(function(res) {
-    if (res.success) {
+  api("registerHotel", { hotelName: name }).then(function(res) {
+    handleApiResponse(res, function(res) {
       showAlert("registerAlert", "success", "✅ Registered! Setting up...");
       setTimeout(checkRegistration, 1500);
-    } else {
-      var msgs = {
-        "ALREADY_REGISTERED": "You already have a hotel registered.",
-        "HOTEL_NAME_TOO_SHORT": "Name is too short (min 3 chars).",
-        "HOTEL_NAME_TOO_LONG": "Name is too long (max 100 chars).",
-        "REGISTRATION_FAILED": "Server error. Please try again.",
-      };
-
-      if (res.error === "AUTH_FAILED") {
-        // Show the SPECIFIC reason + hint from the backend, instead of
-        // just "AUTH_FAILED" — this is what actually tells us (and you)
-        // what to fix, without needing to check GAS Execution logs.
-        showAlert("registerAlert", "error",
-          "AUTH_FAILED (" + (res.reason || "UNKNOWN") + "): " + (res.hint || "No additional detail available.")
-        );
-      } else {
-        showAlert("registerAlert", "error", msgs[res.error] || res.error);
-      }
-    }
+    }, null, "registerAlert");
   });
 }
 
@@ -676,8 +696,11 @@ function doRegister() {
 // ──────────────────────────────────────────────────
 function handleInviteFlow() {
   showScreen("Loading");
-  // First validate the invite to get hotel name
-  fetch(GAS_URL + "?action=validateInvite&token=" + encodeURIComponent(state.inviteToken))
+  fetch(window.GAS_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action: "validateInvite", initData: state.initData, token: state.inviteToken })
+  })
     .then(function(r) { return r.json(); })
     .then(function(res) {
       if (!res.success) {
@@ -701,18 +724,11 @@ function handleInviteFlow() {
 
 function doJoinStaff() {
   showAlert("inviteAlert", "info", "Joining...");
-  apiPost("joinAsStaff", { token: state.inviteToken }).then(function(res) {
-    if (res.success) {
+  api("joinAsStaff", { token: state.inviteToken }).then(function(res) {
+    handleApiResponse(res, function(res) {
       showAlert("inviteAlert", "success", "✅ Joined " + res.hotelName + "!");
       setTimeout(checkRegistration, 1500);
-    } else {
-      var msgs = {
-        "ALREADY_STAFF": "You are already a staff member here.",
-        "STAFF_OF_ANOTHER_HOTEL": "You are already staff at another hotel.",
-        "YOU_ARE_AN_OWNER": "You are an owner and cannot join as staff.",
-      };
-      showAlert("inviteAlert", "error", msgs[res.error] || res.error);
-    }
+    }, null, "inviteAlert");
   });
 }
 
@@ -725,19 +741,17 @@ function loadDashboard() {
   }
 
   var dateVal = document.getElementById("dashboardDate") ? document.getElementById("dashboardDate").value : "";
-  var params = { initData: state.initData };
-  if (dateVal) params.date = dateVal;
+  var params = dateVal ? { date: dateVal } : {};
 
   document.getElementById("logsList").innerHTML = '<div class="loader"><div class="spinner"></div> Loading...</div>';
 
-  api("getDashboard", dateVal ? { date: dateVal } : {}).then(function(res) {
+  api("getDashboard", params).then(function(res) {
     if (!res.success) {
       document.getElementById("logsList").innerHTML =
-        '<div class="empty-state"><div class="icon">⚠️</div><p>' + res.error + '</p></div>';
+        '<div class="empty-state"><div class="icon">⚠️</div><p>' + escHtml(res.error) + '</p></div>';
       return;
     }
 
-    // Update summary
     document.getElementById("summaryIncome").textContent  = "₹" + fmt(res.summary.totalIncome);
     document.getElementById("summaryExpense").textContent = "₹" + fmt(res.summary.totalExpense);
     var bal = res.summary.cashBalance;
@@ -745,7 +759,6 @@ function loadDashboard() {
     balEl.textContent = "₹" + fmt(Math.abs(bal));
     balEl.style.color = bal >= 0 ? "var(--income)" : "var(--expense)";
 
-    // Render logs
     renderLogs(res.logs);
   });
 }
@@ -794,8 +807,8 @@ function renderLogs(logs) {
 // ──────────────────────────────────────────────────
 // LOG ENTRY
 // ──────────────────────────────────────────────────
-function loadCategories() {
-  if (state.categories.length > 0) {
+function loadCategories(forceRefresh) {
+  if (!forceRefresh && state.categories.length > 0) {
     populateCategorySelect();
     return;
   }
@@ -834,21 +847,14 @@ function doSubmitLog() {
   if (!category) { showAlert("logAlert", "error", "Please select a category"); return; }
   if (!amount || amount <= 0) { showAlert("logAlert", "error", "Please enter a valid amount"); return; }
 
-  // NOTE: clientTs is intentionally just Date.now() with NO random suffix.
-  // The idempotency check on the backend works by matching this exact
-  // value — if two submissions carry the same clientTs, the second is
-  // correctly treated as a duplicate (e.g. an accidental double-tap or a
-  // network retry resubmitting the same request). Adding randomness here
-  // would defeat that protection, not improve it. The button is disabled
-  // immediately after the first tap (see below) as the real safeguard
-  // against a user manually firing multiple distinct submissions.
-  var clientTs = Date.now().toString();
+  // Unique idempotency key: timestamp + random suffix
+  var clientTs = Date.now().toString() + "_" + Math.random().toString(36).substring(2, 10);
 
   document.getElementById("submitLogBtn").disabled = true;
   document.getElementById("submitLogBtn").textContent = "Submitting...";
   showAlert("logAlert", "info", "Saving entry...");
 
-  apiPost("submitLog", {
+  api("submitLog", {
     category: category,
     type:     state.selectedType,
     amount:   amount,
@@ -858,26 +864,13 @@ function doSubmitLog() {
     document.getElementById("submitLogBtn").disabled = false;
     document.getElementById("submitLogBtn").textContent = "✅ Submit Entry";
 
-    if (res.success) {
+    handleApiResponse(res, function(res) {
       showAlert("logAlert", "success", "✅ Entry saved!" + (res.message === "DUPLICATE_IGNORED" ? " (duplicate ignored)" : ""));
-      // Reset form
       document.getElementById("categorySelect").value = "";
       document.getElementById("amountInput").value = "";
       document.getElementById("noteInput").value = "";
-      // Haptic feedback
       if (state.tg.HapticFeedback) state.tg.HapticFeedback.notificationOccurred("success");
-    } else {
-      var msgs = {
-        "NOT_A_STAFF_MEMBER": "You are not registered as staff.",
-        "MISSING_CATEGORY":   "Please select a category.",
-        "INVALID_AMOUNT":     "Invalid amount.",
-        "INVALID_TYPE":       "Invalid entry type.",
-        "INVALID_CATEGORY":   "This category is not valid. Please refresh and try again.",
-        "BUSY_TRY_AGAIN":     "Another entry is being saved right now — please tap Submit again.",
-      };
-      showAlert("logAlert", "error", msgs[res.error] || res.error);
-      if (state.tg.HapticFeedback) state.tg.HapticFeedback.notificationOccurred("error");
-    }
+    }, null, "logAlert");
   });
 }
 
@@ -887,19 +880,11 @@ function doSubmitLog() {
 function requestDelete(logId) {
   if (!confirm("Request deletion of this entry? Owner approval needed.")) return;
 
-  apiPost("requestDelete", { logId: logId }).then(function(res) {
-    if (res.success) {
+  api("requestDelete", { logId: logId }).then(function(res) {
+    handleApiResponse(res, function(res) {
       state.tg.showAlert("✅ Delete request sent to owner!");
       loadDashboard();
-    } else {
-      var msgs = {
-        "NOT_YOUR_ENTRY":       "You can only delete your own entries.",
-        "DELETE_WINDOW_EXPIRED": "Delete window expired (10 minutes max).",
-        "ENTRY_NOT_ACTIVE":     "This entry is not active.",
-        "TIMESTAMP_ERROR":      "Could not verify entry time — please contact support.",
-      };
-      state.tg.showAlert("❌ " + (msgs[res.error] || res.error));
-    }
+    }, null, null, true); // useNativeAlert=true
   });
 }
 
@@ -918,15 +903,13 @@ function loadOwnerInfo() {
 function doGenerateInvite() {
   document.getElementById("inviteResult").innerHTML = '<div class="loader"><div class="spinner"></div>Generating...</div>';
 
-  apiPost("generateInvite").then(function(res) {
+  api("generateInvite").then(function(res) {
     if (!res.success) {
       document.getElementById("inviteResult").innerHTML =
-        '<div class="alert alert-error show">❌ ' + res.error + '</div>';
+        '<div class="alert alert-error show">❌ ' + escHtml(res.error) + '</div>';
       return;
     }
 
-    // Construct the invite link
-    // Staff clicks this link → opens bot → bot redirects to Mini App with INV_ param
     if (!state.botUsername) {
       document.getElementById("inviteResult").innerHTML =
         '<div class="alert alert-error show">⚠️ Could not resolve bot username. Reopen the app and try again.</div>';
@@ -937,9 +920,9 @@ function doGenerateInvite() {
     document.getElementById("inviteResult").innerHTML =
       '<div class="invite-box">' +
       '<b>Share this link with your staff:</b>' +
-      '<div class="invite-link">' + inviteUrl + '</div>' +
+      '<div class="invite-link">' + escHtml(inviteUrl) + '</div>' +
       '</div>' +
-      '<button class="btn btn-accent" onclick="copyInvite(\'' + inviteUrl + '\')">📋 Copy Invite Link</button>';
+      '<button class="btn btn-accent" onclick="copyInvite(\'' + escHtml(inviteUrl) + '\')">📋 Copy Invite Link</button>';
   });
 }
 
@@ -962,10 +945,10 @@ function fmt(num) {
 
 function escHtml(str) {
   return String(str || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/&/g, "&")
+    .replace(/</g, "<")
+    .replace(/>/g, ">")
+    .replace(/"/g, """);
 }
 
 function showAlert(id, type, msg) {
