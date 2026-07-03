@@ -558,6 +558,7 @@ function api(action, extraParams) {
   })
     .then(function(r) { return r.json(); })
     .catch(function(err) {
+      alert("API Error: " + err.message);
       console.error("API error:", err);
       return { success: false, error: "NETWORK_ERROR" };
     });
