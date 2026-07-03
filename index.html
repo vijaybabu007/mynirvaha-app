@@ -554,6 +554,7 @@ function api(action, extraParams) {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
     body: JSON.stringify(payload),
+    redirect: "follow" // <--- కచ్చితంగా ఈ లైన్ ఇక్కడే యాడ్ చేయాలి బాస్!
   })
     .then(function(r) { return r.json(); })
     .catch(function(err) {
