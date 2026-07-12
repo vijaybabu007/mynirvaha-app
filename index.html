@@ -597,10 +597,15 @@
     </div>
 
     <!-- Date filter (owner only) -->
-    <div class="filter-row" id="dateFilterRow" style="display:none;">
-      <input type="date" id="dashboardDate" />
-      <button class="btn btn-outline btn-sm" onclick="loadDashboard()">Filter</button>
-      <button class="btn btn-outline btn-sm" onclick="clearDateFilter()">All</button>
+    <div class="filter-row" id="dateFilterRow" style="display:none; align-items: center; gap: 8px; flex-wrap: wrap;">
+      <select id="filterType" class="btn btn-outline btn-sm" onchange="toggleFilterInput()" style="padding: 10px; flex: 1;">
+        <option value="all">All Time</option>
+        <option value="date">Specific Date</option>
+        <option value="month">Specific Month</option>
+      </select>
+      <input type="date" id="dashboardDate" style="display:none; flex: 1;" />
+      <input type="month" id="dashboardMonth" style="display:none; flex: 1;" />
+      <button class="btn btn-primary btn-sm" onclick="loadDashboard()" style="padding: 10px 16px;">Filter</button>
     </div>
 
     <!-- Log entries list -->
@@ -688,7 +693,7 @@
     // ──────────────────────────────────────────────────
     // CONFIGURATION — REPLACE THIS WITH YOUR GAS URL
     // ──────────────────────────────────────────────────
-    var GAS_URL = "https://script.google.com/macros/s/AKfycbxl2oilhA7Wgy4MyqgC4QOE_x9QhkcaEG4s7_N2AbHvFRjfiylEI-MuxYDKwksAb-2QBQ/exec"; // e.g. https://script.google.com/macros/s/ABC.../exec
+    var GAS_URL = "https://script.google.com/macros/s/AKfycbz_cPlcr179PNHNN8eY3auzrxYmwXefbAgbFX0rmvbQDsIkXEpdDvW6-uSJe-gyVrdW/exec"; // e.g. https://script.google.com/macros/s/ABC.../exec
 
     // ──────────────────────────────────────────────────
     // APP STATE
@@ -1020,18 +1025,28 @@
     // ──────────────────────────────────────────────────
     // DASHBOARD
     // ──────────────────────────────────────────────────
+    function toggleFilterInput() {
+      var type = document.getElementById("filterType").value;
+      document.getElementById("dashboardDate").style.display = type === "date" ? "block" : "none";
+      document.getElementById("dashboardMonth").style.display = type === "month" ? "block" : "none";
+    }
+
     function loadDashboard() {
       if (state.role === "OWNER") {
         document.getElementById("dateFilterRow").style.display = "flex";
       }
 
+      var filterType = document.getElementById("filterType") ? document.getElementById("filterType").value : "all";
       var dateVal = document.getElementById("dashboardDate") ? document.getElementById("dashboardDate").value : "";
+      var monthVal = document.getElementById("dashboardMonth") ? document.getElementById("dashboardMonth").value : "";
+      
       var params = { initData: state.initData };
-      if (dateVal) params.date = dateVal;
+      if (filterType === "date" && dateVal) params.date = dateVal;
+      if (filterType === "month" && monthVal) params.month = monthVal;
 
       document.getElementById("logsList").innerHTML = '<div class="loader"><div class="spinner"></div> Loading...</div>';
 
-      api("getDashboard", dateVal ? { date: dateVal } : {}).then(function (res) {
+      api("getDashboard", params).then(function (res) {
         if (!res.success) {
           document.getElementById("logsList").innerHTML =
             '<div class="empty-state"><div class="icon">⚠️</div><p>' + res.error + '</p></div>';
@@ -1051,10 +1066,7 @@
       });
     }
 
-    function clearDateFilter() {
-      document.getElementById("dashboardDate").value = "";
-      loadDashboard();
-    }
+    // Removed clearDateFilter as we now use the filter dropdown
 
     function renderLogs(logs) {
       var container = document.getElementById("logsList");
