@@ -639,7 +639,7 @@
 
       <div class="field">
         <label>Amount (₹)</label>
-        <input type="number" id="amountInput" placeholder="0.00" min="1" step="0.01" />
+        <input type="number" id="amountInput" placeholder="0.00" min="1" step="0.01" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');" />
       </div>
 
       <div class="field">
@@ -681,7 +681,7 @@
     <button class="nav-btn" id="navLog" onclick="switchTab('Log')">
       <span class="nav-icon">➕</span>New Entry
     </button>
-    <button class="nav-btn" id="navOwner" onclick="switchTab('Owner')" id="navOwnerBtn" style="display:none;">
+    <button class="nav-btn" id="navOwner" onclick="switchTab('Owner')" style="display:none;">
       <span class="nav-icon">⚙️</span>Manage
     </button>
   </nav>
@@ -733,6 +733,16 @@
 
       // Apply Telegram theme
       document.documentElement.style.setProperty("--bg", state.tg.themeParams.bg_color || "#f5f5f5");
+
+      // Set max limits for date and month filters to prevent future selection
+      var today = new Date();
+      var yyyy = today.getFullYear();
+      var mm = String(today.getMonth() + 1).padStart(2, '0');
+      var dd = String(today.getDate()).padStart(2, '0');
+      var dashboardDateEl = document.getElementById("dashboardDate");
+      var dashboardMonthEl = document.getElementById("dashboardMonth");
+      if (dashboardDateEl) dashboardDateEl.max = yyyy + "-" + mm + "-" + dd;
+      if (dashboardMonthEl) dashboardMonthEl.max = yyyy + "-" + mm;
 
       state.user = state.tg.initDataUnsafe.user;
       state.initData = state.tg.initData;
@@ -907,7 +917,7 @@
         // Show nav
         document.getElementById("bottomNav").style.display = "flex";
         if (res.role === "OWNER") {
-          document.getElementById("navOwnerBtn").style.display = "flex";
+          document.getElementById("navOwner").style.display = "flex";
         }
 
         showScreen("Home");
@@ -1089,7 +1099,7 @@
         html += '<span class="log-category">' + escHtml(log.category) + '</span>';
         html += '<span class="log-amount ' + amountClass + '">' + prefix + '₹' + fmt(log.amount) + '</span>';
         html += '</div>';
-        html += '<div class="log-meta">👤 ' + escHtml(log.staffName) + ' &nbsp;•&nbsp; 🕐 ' + log.loggedAt.substring(11, 16) + '</div>';
+        html += '<div class="log-meta">👤 ' + escHtml(log.staffName) + ' &nbsp;•&nbsp; 📅 ' + log.loggedAt.substring(0, 10) + ' 🕐 ' + log.loggedAt.substring(11, 16) + '</div>';
         if (log.note) {
           html += '<div class="log-meta">📝 ' + escHtml(log.note) + '</div>';
         }
