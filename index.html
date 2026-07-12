@@ -561,6 +561,14 @@
         <input type="text" id="hotelNameInput" placeholder="e.g. Sri Venkata Tiffins" maxlength="100" />
       </div>
       <button class="btn btn-primary" onclick="doRegister()">🚀 Start Free Trial</button>
+
+      <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--border);">
+        <p style="font-size:14px;color:var(--hint);margin-bottom:8px;">Have a staff invite link?</p>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="manualInviteInput" placeholder="Paste invite link here" style="flex:1; font-size:14px;" />
+          <button class="btn btn-outline" onclick="doManualInvite()" style="padding:0 16px; width:auto; border-color:var(--primary); color:var(--primary);">Join</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1030,6 +1038,21 @@
           showAlert("inviteAlert", "error", msgs[res.error] || res.error);
         }
       });
+    }
+
+    function doManualInvite() {
+      var input = document.getElementById("manualInviteInput").value.trim();
+      if (!input) return;
+      
+      var token = input;
+      // Extract token if they pasted the full URL
+      var invIndex = input.indexOf("INV_");
+      if (invIndex !== -1) {
+        token = input.substring(invIndex + 4);
+      }
+      
+      state.inviteToken = token;
+      handleInviteFlow();
     }
 
     // ──────────────────────────────────────────────────
